@@ -40,11 +40,6 @@ class TPOMonitor:
 
         except Exception as e:
             print(f"Error initializing browser: {e}")
-    
-            except Exception as e:
-                print(f"Error initializing browser: {str(e)}")
-                traceback.print_exc()
-                raise
 
     def login(self):
         try:
