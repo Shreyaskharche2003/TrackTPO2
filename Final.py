@@ -11,19 +11,23 @@ import os
 
 # Load environment variables
 load_dotenv()
-import subprocess
 from playwright.sync_api import sync_playwright
-import os
+
+import subprocess
+import sys
 
 def install_playwright_dependencies():
     try:
         print("Installing Playwright dependencies...")
-        subprocess.run(["playwright", "install"], check=True)
-    except Exception as e:
-        print(f"Failed to install Playwright dependencies: {str(e)}")
+        # Try installing Playwright dependencies
+        subprocess.run(["apt-get", "update"], check=True)
+        subprocess.run(["apt-get", "install", "libx11-xcb1", "libnss3", "libatk-bridge2.0-0", "libgtk-3-0", "libgbm1", "-y"], check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error installing dependencies: {str(e)}")
         raise
 
 install_playwright_dependencies()
+
 
 
 class TPOMonitor:
