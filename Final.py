@@ -1,20 +1,25 @@
-import asyncio
-from pyppeteer import launch
-from dotenv import load_dotenv
-import os
+import schedule
+import time
 from datetime import datetime
-import smtplib
+from collections import deque
 from email.mime.text import MIMEText
+import smtplib
 import traceback
+import os
+from dotenv import load_dotenv
+from pyppeteer import launch
+import asyncio
+import streamlit as st
 
-# Load environment variables
+# Load environment variables from .env file
 load_dotenv()
 
 class TPOMonitor:
-    def __init__(self, username, password):
-        self.username = username
-        self.password = password
-        self.latest_companies = []
+
+    def __init__(self):
+        self.username = os.getenv("TPO_USERNAME")
+        self.password = os.getenv("TPO_PASSWORD")
+        self.latest_companies = deque()
         self.browser = None
         self.page = None
         self.is_first_run = True
@@ -22,17 +27,17 @@ class TPOMonitor:
 
     async def initialize_browser(self):
         try:
-            # Launch the browser using Pyppeteer
+            if self.browser:
+                await self.browser.close()
+
             self.browser = await launch(headless=True)
             self.page = await self.browser.newPage()
-
-            if self.page is None:
-                raise Exception("Failed to create page object")
-
             await self.login()
+
         except Exception as e:
-            print(f"Error initializing browser: {e}")
-            self.page = None  # Explicitly set page to None if there's an error
+            print(f"Error initializing browser: {str(e)}")
+            traceback.print_exc()
+            raise
 
     async def login(self):
         try:
@@ -43,7 +48,7 @@ class TPOMonitor:
             await self.page.type("input[placeholder='Enter Your Password']", self.password)
             await self.page.click("button.logi")
 
-            await self.page.waitForNavigation({"waitUntil": "domcontentloaded"})
+            await self.page.waitForSelector("body", timeout=10000)
             print("Login successful!")
 
         except Exception as e:
@@ -53,19 +58,23 @@ class TPOMonitor:
 
     async def get_current_companies(self):
         try:
-            if self.page is None:
-                print("Browser page is not initialized.")
-                return []
-
             await self.page.goto("https://tpo.vierp.in/company-dashboard")
-            # Add your scraping logic here to get the list of companies
 
-            return []  # Return a placeholder list (to be replaced with actual scraping logic)
+            await self.page.waitForSelector("table", timeout=10000)
+
+            company_rows = await self.page.querySelectorAll("table tbody tr")
+            current_companies = [
+                await row.querySelectorEval("td:nth-child(1)", "el => el.innerText") for row in company_rows[:10]
+            ]
+
+            return current_companies
+
         except Exception as e:
-            print(f"Error while navigating: {e}")
-            return []
+            print(f"Error getting companies: {str(e)}")
+            traceback.print_exc()
+            raise
 
-    async def send_alert_email(self, new_companies):
+    def send_alert_email(self, new_companies):
         try:
             email_from = os.getenv("EMAIL_FROM")
             email_to = os.getenv("EMAIL_TO").split(",")
@@ -102,7 +111,7 @@ class TPOMonitor:
             current_companies = await self.get_current_companies()
 
             if self.is_first_run:
-                self.latest_companies = current_companies
+                self.latest_companies = deque(current_companies)
                 self.is_first_run = False
                 print("Initial company list stored")
                 return
@@ -112,8 +121,8 @@ class TPOMonitor:
 
             if new_companies:
                 print(f"Found {len(new_companies)} new companies!")
-                await self.send_alert_email(new_companies)
-                self.latest_companies = current_companies
+                self.send_alert_email(new_companies)
+                self.latest_companies = deque(current_companies)
             else:
                 print("No new companies found")
 
@@ -121,14 +130,25 @@ class TPOMonitor:
             print(f"Error during update check: {str(e)}")
             traceback.print_exc()
 
+            # Call session recovery
+            try:
+                await self.recover_session()
+            except Exception as recovery_error:
+                print(f"Failed to recover session: {str(recovery_error)}")
+
     async def run_monitor(self):
         print("Starting TPO Monitor...")
         try:
             await self.initialize_browser()
 
-            while True:
-                await self.check_for_updates()
-                await asyncio.sleep(1800)  # Wait for 30 minutes before checking again
+            schedule.every(30).minutes.do(lambda: asyncio.ensure_future(self.check_for_updates()))
+
+            # Initial check
+            await self.check_for_updates()
+
+            while self.is_running:
+                schedule.run_pending()
+                await asyncio.sleep(1)
 
         except Exception as e:
             print(f"Error in run_monitor: {str(e)}")
@@ -136,10 +156,47 @@ class TPOMonitor:
             if self.browser:
                 await self.browser.close()
 
-# Automatically start monitoring when deployed
-if __name__ == "__main__":
-    username = os.getenv("TPO_USERNAME")
-    password = os.getenv("TPO_PASSWORD")
-    monitor = TPOMonitor(username, password)
+    async def recover_session(self):
+        try:
+            print(f"\n[{datetime.now()}] Attempting session recovery...")
+            await self.initialize_browser()  # Reinitialize the browser
+            self.is_first_run = False  # Ensure it doesn’t reset the latest_companies
+            print("Session recovered successfully!")
+        except Exception as e:
+            print(f"Session recovery failed: {str(e)}")
+            traceback.print_exc()
+            raise
 
-    asyncio.run(monitor.run_monitor())
+
+# Streamlit Integration
+st.title("TPO Monitoring Dashboard")
+st.markdown("""
+This app allows you to monitor the TPO portal for updates and receive alerts for new companies.  
+Use the buttons below to start or stop monitoring.
+""")
+
+monitor = TPOMonitor()
+
+if "is_running" not in st.session_state:
+    st.session_state.is_running = False
+
+# Start Monitoring
+if st.button("Start Monitoring") and not st.session_state.is_running:
+    st.info("Starting the TPO monitor. Please wait...")
+    try:
+        st.session_state.is_running = True
+        asyncio.run(monitor.run_monitor())
+    except Exception as e:
+        st.error(f"Error: {str(e)}")
+
+# Stop Monitoring
+if st.button("Stop Monitoring") and st.session_state.is_running:
+    st.warning("Stopping the monitor...")
+    try:
+        monitor.is_running = False
+        st.session_state.is_running = False
+        if monitor.browser:
+            asyncio.run(monitor.browser.close())
+        st.success("Monitoring stopped.")
+    except Exception as e:
+        st.error(f"Error while stopping: {str(e)}")
