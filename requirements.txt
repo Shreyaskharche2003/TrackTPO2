@@ -1,4 +1,2 @@
-schedule
 python-dotenv
-streamlit
 pyppeteer
