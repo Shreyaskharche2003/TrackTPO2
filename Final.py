@@ -26,20 +26,24 @@ class TPOMonitor:
 
     def initialize_browser(self):
         try:
-        # Make sure that Playwright browsers are installed
+            # Ensure Playwright browsers are installed
             os.system("playwright install")
-
+            
             if self.browser:
                 self.browser.close()
-            
-        # Now start the browser
+    
             playwright = sync_playwright().start()
             self.browser = playwright.chromium.launch(headless=True)
             self.page = self.browser.new_page()
+    
+            # Check if the page is successfully created
+            if self.page is None:
+                raise Exception("Failed to create page object")
+    
             self.login()
-
         except Exception as e:
             print(f"Error initializing browser: {e}")
+            self.page = None  # Explicitly set page to None if there's an error
 
     def login(self):
         try:
@@ -60,16 +64,16 @@ class TPOMonitor:
 
     def get_current_companies(self):
         try:
+            if self.page is None:
+                print("Browser page is not initialized.")
+                return []
+    
             self.page.goto("https://tpo.vierp.in/company-dashboard")
+            # Continue with your scraping logic here...
+        except Exception as e:
+            print(f"Error while navigating: {e}")
+            return []
 
-            self.page.wait_for_selector("table", timeout=10000)
-
-            company_rows = self.page.query_selector_all("table tbody tr")
-            current_companies = [
-                row.query_selector("td:nth-child(1)").inner_text() for row in company_rows[:10]
-            ]
-
-            return current_companies
 
         except Exception as e:
             print(f"Error getting companies: {str(e)}")
