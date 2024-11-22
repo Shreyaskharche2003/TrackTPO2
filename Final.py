@@ -33,17 +33,20 @@ class TPOMonitor:
                 self.browser.close()
     
             playwright = sync_playwright().start()
-            self.browser = playwright.chromium.launch(headless=True)
+            
+            # Launch the browser with --no-sandbox flag to bypass sandboxing issues
+            self.browser = playwright.chromium.launch(headless=True, args=["--no-sandbox"])
             self.page = self.browser.new_page()
     
             # Check if the page is successfully created
             if self.page is None:
                 raise Exception("Failed to create page object")
-    
-            self.login()
-        except Exception as e:
-            print(f"Error initializing browser: {e}")
-            self.page = None  # Explicitly set page to None if there's an error
+
+        self.login()
+    except Exception as e:
+        print(f"Error initializing browser: {e}")
+        self.page = None  # Explicitly set page to None if there's an error
+
 
     def login(self):
         try:
