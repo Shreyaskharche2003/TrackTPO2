@@ -11,6 +11,19 @@ import os
 
 # Load environment variables
 load_dotenv()
+import subprocess
+from playwright.sync_api import sync_playwright
+import os
+
+def install_playwright_dependencies():
+    try:
+        print("Installing Playwright dependencies...")
+        subprocess.run(["playwright", "install"], check=True)
+    except Exception as e:
+        print(f"Failed to install Playwright dependencies: {str(e)}")
+        raise
+
+install_playwright_dependencies()
 
 
 class TPOMonitor:
@@ -25,7 +38,7 @@ class TPOMonitor:
     def initialize_browser(self):
         try:
             # Install Playwright and its dependencies
-            os.system("playwright install --with-deps")
+            os.system("playwright install-deps")
             print("Playwright installed successfully!")
 
             if self.browser:
