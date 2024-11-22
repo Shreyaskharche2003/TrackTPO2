@@ -2,4 +2,3 @@ schedule
 python-dotenv
 pyppeteer
 streamlit
-email
