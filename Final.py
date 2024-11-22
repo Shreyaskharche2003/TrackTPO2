@@ -12,27 +12,31 @@ import os
 # Load environment variables
 load_dotenv()
 import subprocess
-
 def install_playwright_dependencies():
     try:
         print("Installing Playwright dependencies...")
-        # First, install Playwright dependencies (this may work locally but not on Streamlit Cloud)
-        subprocess.run(["playwright", "install-deps"], check=True)
         
-        # Then, install Playwright browsers
+        # Attempt to install system dependencies (skip if it fails in restricted environments)
+        try:
+            subprocess.run(["playwright", "install-deps"], check=True)
+        except subprocess.CalledProcessError:
+            print("playwright install-deps failed - skipping this step.")
+        
+        # Install Playwright browsers
         subprocess.run(["playwright", "install"], check=True)
         
-        print("Playwright and dependencies installed successfully.")
+        print("Playwright and browsers installed successfully.")
     
     except subprocess.CalledProcessError as e:
-        print(f"Failed to install Playwright dependencies: {str(e)}")
+        print(f"Failed to install Playwright dependencies or browsers: {str(e)}")
         raise
     except Exception as e:
-        print(f"An error occurred: {str(e)}")
+        print(f"An unexpected error occurred: {str(e)}")
         raise
 
 # Attempt to install dependencies
 install_playwright_dependencies()
+
 
 
 
