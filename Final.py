@@ -11,33 +11,17 @@ import os
 
 # Load environment variables
 load_dotenv()
-from playwright.sync_api import sync_playwright
-
 import subprocess
-import sys
-
+from playwright.sync_api import sync_playwright
+import os
 def install_playwright_dependencies():
     try:
         print("Installing Playwright dependencies...")
-        # First, install Playwright dependencies (this may work locally but not on Streamlit Cloud)
-        subprocess.run(["playwright", "install-deps"], check=True)
-        
-        # Then, install Playwright browsers
         subprocess.run(["playwright", "install"], check=True)
-        
-        print("Playwright and dependencies installed successfully.")
-    
-    except subprocess.CalledProcessError as e:
+    except Exception as e:
         print(f"Failed to install Playwright dependencies: {str(e)}")
         raise
-    except Exception as e:
-        print(f"An error occurred: {str(e)}")
-        raise
-
-# Attempt to install dependencies
 install_playwright_dependencies()
-
-
 
 
 class TPOMonitor:
@@ -52,6 +36,7 @@ class TPOMonitor:
     def initialize_browser(self):
         try:
             # Install Playwright and its dependencies
+            os.system("playwright install --with-deps")
             os.system("playwright install-deps")
             print("Playwright installed successfully!")
 
