@@ -1,75 +1,49 @@
-import schedule
-import time
-from datetime import datetime
-from collections import deque
-from email.mime.text import MIMEText
-import smtplib
-import traceback
+import asyncio
+from pyppeteer import launch
 from dotenv import load_dotenv
 import os
+from datetime import datetime
+import smtplib
+from email.mime.text import MIMEText
+import traceback
 
 # Load environment variables
 load_dotenv()
-import subprocess
-
-def install_dependencies():
-    try:
-        subprocess.run(['playwright', 'install-deps'], check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"Error installing dependencies: {e}")
-
-install_dependencies()
-from playwright.sync_api import sync_playwright
-
-
-
 
 class TPOMonitor:
-
     def __init__(self, username, password):
         self.username = username
         self.password = password
-        self.latest_companies = deque()
+        self.latest_companies = []
         self.browser = None
         self.page = None
         self.is_first_run = True
         self.is_running = False
 
-    def initialize_browser(self):
+    async def initialize_browser(self):
         try:
-            # Ensure Playwright browsers are installed
-            os.system("playwright install")
-            
-            if self.browser:
-                self.browser.close()
-    
-            playwright = sync_playwright().start()
-            
-            # Launch the browser with --no-sandbox flag to bypass sandboxing issues
-            self.browser = playwright.chromium.launch(headless=True, args=["--no-sandbox"])
-            self.page = self.browser.new_page()
-    
-            # Check if the page is successfully created
+            # Launch the browser using Pyppeteer
+            self.browser = await launch(headless=True)
+            self.page = await self.browser.newPage()
+
             if self.page is None:
                 raise Exception("Failed to create page object")
-    
-            self.login()
+
+            await self.login()
         except Exception as e:
             print(f"Error initializing browser: {e}")
             self.page = None  # Explicitly set page to None if there's an error
 
-
-
-    def login(self):
+    async def login(self):
         try:
             print(f"\n[{datetime.now()}] Logging in to TPO portal...")
-            self.page.goto("https://tpo.vierp.in")
+            await self.page.goto("https://tpo.vierp.in")
 
-            self.page.fill("input[placeholder='Enter Your Username']", self.username)
-            self.page.fill("input[placeholder='Enter Your Password']", self.password)
-            self.page.click("button.logi")
+            await self.page.type("input[placeholder='Enter Your Username']", self.username)
+            await self.page.type("input[placeholder='Enter Your Password']", self.password)
+            await self.page.click("button.logi")
 
-            self.page.wait_for_url("**/home", timeout=10000)
+            await self.page.waitForNavigation({"waitUntil": "domcontentloaded"})
             print("Login successful!")
 
         except Exception as e:
@@ -77,25 +51,21 @@ class TPOMonitor:
             traceback.print_exc()
             raise
 
-    def get_current_companies(self):
+    async def get_current_companies(self):
         try:
             if self.page is None:
                 print("Browser page is not initialized.")
                 return []
-    
-            self.page.goto("https://tpo.vierp.in/company-dashboard")
-            # Continue with your scraping logic here...
+
+            await self.page.goto("https://tpo.vierp.in/company-dashboard")
+            # Add your scraping logic here to get the list of companies
+
+            return []  # Return a placeholder list (to be replaced with actual scraping logic)
         except Exception as e:
             print(f"Error while navigating: {e}")
             return []
 
-
-        except Exception as e:
-            print(f"Error getting companies: {str(e)}")
-            traceback.print_exc()
-            raise
-
-    def send_alert_email(self, new_companies):
+    async def send_alert_email(self, new_companies):
         try:
             email_from = os.getenv("EMAIL_FROM")
             email_to = os.getenv("EMAIL_TO").split(",")
@@ -126,13 +96,13 @@ class TPOMonitor:
             print(f"Failed to send email: {str(e)}")
             traceback.print_exc()
 
-    def check_for_updates(self):
+    async def check_for_updates(self):
         try:
             print(f"\n[{datetime.now()}] Checking for new companies...")
-            current_companies = self.get_current_companies()
+            current_companies = await self.get_current_companies()
 
             if self.is_first_run:
-                self.latest_companies = deque(current_companies)
+                self.latest_companies = current_companies
                 self.is_first_run = False
                 print("Initial company list stored")
                 return
@@ -142,8 +112,8 @@ class TPOMonitor:
 
             if new_companies:
                 print(f"Found {len(new_companies)} new companies!")
-                self.send_alert_email(new_companies)
-                self.latest_companies = deque(current_companies)
+                await self.send_alert_email(new_companies)
+                self.latest_companies = current_companies
             else:
                 print("No new companies found")
 
@@ -151,47 +121,25 @@ class TPOMonitor:
             print(f"Error during update check: {str(e)}")
             traceback.print_exc()
 
-            # Call session recovery
-            try:
-                self.recover_session()
-            except Exception as recovery_error:
-                print(f"Failed to recover session: {str(recovery_error)}")
-
-
-    def run_monitor(self):
+    async def run_monitor(self):
         print("Starting TPO Monitor...")
         try:
-            self.initialize_browser()
-
-            schedule.every(30).minutes.do(self.check_for_updates)
-
-            self.check_for_updates()
+            await self.initialize_browser()
 
             while True:
-                schedule.run_pending()
-                time.sleep(1)
+                await self.check_for_updates()
+                await asyncio.sleep(1800)  # Wait for 30 minutes before checking again
 
         except Exception as e:
             print(f"Error in run_monitor: {str(e)}")
             traceback.print_exc()
             if self.browser:
-                self.browser.close()
-    def recover_session(self):
-        try:
-            print(f"\n[{datetime.now()}] Attempting session recovery...")
-            self.initialize_driver()  # Reinitialize the driver
-            self.is_first_run = False  # Ensure it doesn’t reset the latest_companies
-            print("Session recovered successfully!")
-        except Exception as e:
-            print(f"Session recovery failed: {str(e)}")
-        traceback.print_exc()
-        raise
-
-
+                await self.browser.close()
 
 # Automatically start monitoring when deployed
 if __name__ == "__main__":
     username = os.getenv("TPO_USERNAME")
     password = os.getenv("TPO_PASSWORD")
     monitor = TPOMonitor(username, password)
-    monitor.run_monitor()
+
+    asyncio.run(monitor.run_monitor())
