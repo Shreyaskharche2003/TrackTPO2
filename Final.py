@@ -5,12 +5,23 @@ from collections import deque
 from email.mime.text import MIMEText
 import smtplib
 import traceback
-from playwright.sync_api import sync_playwright
 from dotenv import load_dotenv
 import os
 
 # Load environment variables
 load_dotenv()
+import subprocess
+
+def install_dependencies():
+    try:
+        subprocess.run(['playwright', 'install-deps'], check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error installing dependencies: {e}")
+
+install_dependencies()
+from playwright.sync_api import sync_playwright
+
+
 
 
 class TPOMonitor:
@@ -41,11 +52,12 @@ class TPOMonitor:
             # Check if the page is successfully created
             if self.page is None:
                 raise Exception("Failed to create page object")
-
+    
             self.login()
         except Exception as e:
             print(f"Error initializing browser: {e}")
             self.page = None  # Explicitly set page to None if there's an error
+
 
 
     def login(self):
