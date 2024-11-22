@@ -26,18 +26,25 @@ class TPOMonitor:
 
     def initialize_browser(self):
         try:
+        # Make sure that Playwright browsers are installed
+            os.system("playwright install")
+
             if self.browser:
                 self.browser.close()
-
+            
+        # Now start the browser
             playwright = sync_playwright().start()
             self.browser = playwright.chromium.launch(headless=True)
             self.page = self.browser.new_page()
             self.login()
 
         except Exception as e:
-            print(f"Error initializing browser: {str(e)}")
-            traceback.print_exc()
-            raise
+            print(f"Error initializing browser: {e}")
+    
+            except Exception as e:
+                print(f"Error initializing browser: {str(e)}")
+                traceback.print_exc()
+                raise
 
     def login(self):
         try:
