@@ -42,10 +42,10 @@ class TPOMonitor:
             if self.page is None:
                 raise Exception("Failed to create page object")
 
-        self.login()
-    except Exception as e:
-        print(f"Error initializing browser: {e}")
-        self.page = None  # Explicitly set page to None if there's an error
+            self.login()
+        except Exception as e:
+            print(f"Error initializing browser: {e}")
+            self.page = None  # Explicitly set page to None if there's an error
 
 
     def login(self):
