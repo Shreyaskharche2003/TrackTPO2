@@ -19,14 +19,24 @@ import sys
 def install_playwright_dependencies():
     try:
         print("Installing Playwright dependencies...")
-        # Try installing Playwright dependencies
-        subprocess.run(["apt-get", "update"], check=True)
-        subprocess.run(["apt-get", "install", "libx11-xcb1", "libnss3", "libatk-bridge2.0-0", "libgtk-3-0", "libgbm1", "-y"], check=True)
+        # First, install Playwright dependencies (this may work locally but not on Streamlit Cloud)
+        subprocess.run(["playwright", "install-deps"], check=True)
+        
+        # Then, install Playwright browsers
+        subprocess.run(["playwright", "install"], check=True)
+        
+        print("Playwright and dependencies installed successfully.")
+    
     except subprocess.CalledProcessError as e:
-        print(f"Error installing dependencies: {str(e)}")
+        print(f"Failed to install Playwright dependencies: {str(e)}")
+        raise
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
         raise
 
+# Attempt to install dependencies
 install_playwright_dependencies()
+
 
 
 
