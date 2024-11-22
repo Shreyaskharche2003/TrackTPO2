@@ -1,0 +1,4 @@
+schedule
+playwright
+python-dotenv
+streamlit
